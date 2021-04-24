@@ -1,136 +1,69 @@
 import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
-import { BehaviorSubject, combineLatest, interval, Observable, of, Subject } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
 import * as _ from 'lodash';
-import { animate, style, transition, trigger } from '@angular/animations';
+import * as actions from './store/actions';
 
 
-/**
- * Conclusion so far:
- * 
- * Angular animation is great but in this experiment,
- * it fails to address the ticker problem, it re-animates when a ticker fires.
- */
 
-type Card = {
-  id: string
-  name: string
-  answer: number
-}
+import { createSelector, createFeatureSelector, Store, select } from "@ngrx/store";
+import { AppState, Compute } from './store/app-state';
+import { Observable, pipe } from 'rxjs';
+import { map, startWith, tap } from 'rxjs/operators';
+import { identity } from 'lodash';
 
-type Swimlane = {
-  id: string
-  cards: Card[]
-}
+// Select Top Level Feature States.
+const computeFeatureSelector = createFeatureSelector<AppState, Compute>("compute");
+const counterFeatureSelector = createFeatureSelector<AppState, AppState['counter']>("counter");
 
-type Data = {
-  swimlanes: Swimlane[]
-}
+// const computeSelector = createSelector(
+//   counterFeatureSelector,
+//   computeFeatureSelector,
+//   (counter, compute) => compute.result.reduce((a, b) => a + b, 0)
+// );
 
+
+
+
+// Without feature selector =================================================================
+
+// // Select Top Level States.
+const selectCounter = (appState: AppState) => appState.counter;
+const selectCompute = (appState: AppState) => appState.compute;
+
+const computeSelector = createSelector(selectCounter, selectCompute, (counter, compute) => {
+
+  // process data for view.
+  return compute.result.reduce((a, b) => a + b, 0);
+});
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  animations: [
-    trigger('fade', [
-      transition('void => *', [
-        style({ backgroundColor: 'green', opacity: 0 }),
-        animate(2000)
-      ])
-    ])
-  ]
 })
 export class AppComponent implements OnInit {
-  title = 'angular-sandbox';
 
-  data$: Observable<Data>
-  searchKeyWord$: BehaviorSubject<string>
+  // computeResult$: Observable<number[]>
+  computeResult$: Observable<any>
+
+  constructor(private store: Store<{ appState: AppState }>) {
+    
+  }
 
   ngOnInit() {
 
-    // expensive fibonacci
-    function fibonacci(num) {
-      if (num <= 1) return 1;
-      return fibonacci(num - 1) + fibonacci(num - 2);
-    }
-
-    // util
-    function randomIntFromInterval(min, max) { // min and max included
-      return Math.floor(Math.random() * (max - min + 1) + min);
-    }
-
-    /**
-     * Populate Mock Cards based on swimlane id.
-     * @param swimlaneId 
-     */
-    const populateMockCards = (swimlaneId: string) => (length: number): Card[] => {
-
-      let acc: Card[] = [];
-      for(let i=0; i<length; i++) {
-        acc = [
-          ...acc,
-          { id: swimlaneId + '-' + i,
-            name: 'c' + swimlaneId + '-' + i,
-            answer: fibonacci(randomIntFromInterval(1, 30))
-          }
-        ]
-      }
-      return acc;
-    };
-      
-
-    const source$ = of({
-      swimlanes: [
-      { id: '1', cards: populateMockCards('1')(1000) },
-      { id: '2', cards: populateMockCards('2')(1000) },
-      { id: '3', cards: populateMockCards('3')(1000) }
-      ]
-    });
-
-    this.searchKeyWord$ = new BehaviorSubject("");
-    const ticker$ = interval(1000);
-  
-    this.data$ = combineLatest([
-      source$,
-      this.searchKeyWord$,
-      // ticker$
-    ])
-      .pipe(
-        map(([data, keyword]) => {
-
-          if (keyword === "") { // no keyword then return plain data.
-            return {
-              ...data,
-              swimlanes: data.swimlanes.map(swimlane =>
-                ({ ...swimlane,
-                  cards: swimlane.cards.map(x => x) // map identity
-                })) 
-            }
-          } else {
-            return {
-              ...data,
-              swimlanes: data.swimlanes.map(swimlane =>
-                ({ ...swimlane,
-                  cards: swimlane.cards.filter(card => card.name.includes(keyword))
-                })) 
-            }
-          }
-        }),
-        tap(x => console.log('fired'))
-      )
+    this.computeResult$ = this.store.pipe(
+      map(({ appState }) => appState),
+      tap(x => console.log('[before selector] compute result: ', x)),
+      select(computeSelector),
+      tap(x => console.log('[after selector] compute result: ', x)),
+      );
   }
 
-  search(ev) {
-    console.log('searching ev: ', ev.target.value);
-    this.searchKeyWord$.next(ev.target.value);
-  }
 
-  public fibonacci(num) {
-    if (num <= 1) return 1;
-    return this.fibonacci(num - 1) + this.fibonacci(num - 2);
-  }
+  public compute() {
 
+    this.store.dispatch(actions.computeAction({ kind: 'compute' }));
+  }
 
 }

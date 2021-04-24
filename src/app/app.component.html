@@ -1,22 +1,6 @@
 <router-outlet></router-outlet>
 
 <div>
-    Search: <input type="text" (keyup)="search($event)">
+    <button (click)="compute()">Compute</button>
+    <div>Compute: {{ computeResult$ | async | json }}</div>
 </div>
-<div id="result">
-    <ng-container *ngIf="data$ | async as data">
-        <div style="display: flex;">
-            <div *ngFor="let swimlane of data.swimlanes" class="swimlane">
-                <div class="swimlane-header">
-                    Swimlane Header
-                </div>
-                <div @fade *ngFor="let card of swimlane.cards" class="card">
-                    <span>{{ card.id }}</span> | 
-                    <span>{{ card.name }}</span> | 
-                    <span>{{ card.answer }}</span>
-                </div>
-            </div>
-        </div>
-    </ng-container>
-</div>
-
