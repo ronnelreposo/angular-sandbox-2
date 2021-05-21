@@ -1,6 +1,38 @@
 <router-outlet></router-outlet>
 
 <div>
-    <button (click)="compute()">Compute</button>
-    <div>Compute: {{ computeResult$ | async | json }}</div>
+
+    <div>
+        <button (click)="loadItems()">Load Items</button>
+    </div>
+
+    <div>
+        <input type="search" (input)="search($event.target.value)" />
+    </div>
+
+    <div>
+        <button (click)="selectGroup('all')">All</button>
+        <button (click)="selectGroup('active')">Active User</button>
+        <button (click)="selectGroup('inactive')">Non Active User</button>
+    </div>
+
+    <ng-container *ngIf="data$ | async as data">
+
+        <!-- Selected Items-->
+        <div class="card">
+            <div>Selected Items</div>
+            <ng-container *ngFor="let person of data.selectedItems">
+                <div><button (click)=remove(person)>Remove</button>{{ person | json }}</div>
+            </ng-container>
+        </div>
+
+        <!-- Items-->
+        <div class="card">
+            <div>Items</div>
+            <ng-container *ngFor="let person of data.items">
+                <div><button (click)=select(person)>Select</button>{{ person | json }}</div>
+            </ng-container>
+        </div>
+    </ng-container>
+
 </div>
