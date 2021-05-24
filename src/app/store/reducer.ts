@@ -97,6 +97,27 @@ const _appReducer = createReducer(
             }
         };
     }),
+    on(actions.addAllActive, (appState: AppState): AppState => {
+
+        // Get all the active users.
+        const activeNames = appState.customSelect.items
+            .filter(item => item.status === 'Active')
+            .map(item => item.name);
+
+        // Question. Why not pick all the active names? why do we need to union from the selected names?
+        // Answer. This is to demonstrate on how to combine items that are already selected and
+        //  all the items from the lookup, it could happen that the business domain requires custom equality
+        //  in that case, you need _.unionWith or _.unionBy and pass the custom equality check.
+        const allActiveNames = _.union(activeNames, appState.customSelect.selectedNames);
+
+        return {
+            ...appState,
+            customSelect: {
+                ...appState.customSelect,
+                selectedNames: allActiveNames,
+            }
+        };
+    }),
 );
 
 export function appReducer(state, action) {

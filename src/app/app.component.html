@@ -12,8 +12,9 @@
 
     <div>
         <button (click)="selectGroup('all')">All</button>
-        <button (click)="selectGroup('active')">Active User</button>
-        <button (click)="selectGroup('inactive')">Non Active User</button>
+        <button (click)="selectGroup('active')">Active Users</button>
+        <button (click)="selectGroup('inactive')">Non Active Users</button>
+        <button (click)="addAllActive()">Add All Active Users</button>
     </div>
 
     <ng-container *ngIf="data$ | async as data">

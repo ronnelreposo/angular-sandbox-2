@@ -177,4 +177,9 @@ export class AppComponent implements OnInit {
 
     this.store.dispatch(actions.group({ groupValue: group }));
   }
+
+  public addAllActive() {
+
+    this.store.dispatch(actions.addAllActive());
+  }
 }
