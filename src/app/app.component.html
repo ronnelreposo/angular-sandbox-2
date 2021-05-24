@@ -21,7 +21,10 @@
 
         <!-- Selected Items-->
         <div class="card">
-            <div>Selected Items</div>
+            <div>Selected Items ({{ data.selectedItems.length }})</div>
+            <div>
+                <button (click)="clearAllSelected()">Clear All Selected</button>
+            </div>
             <ng-container *ngFor="let person of data.selectedItems">
                 <div><button (click)=remove(person)>Remove</button>{{ person | json }}</div>
             </ng-container>
@@ -29,7 +32,7 @@
 
         <!-- Items-->
         <div class="card">
-            <div>Items</div>
+            <div>Items ({{ data.items.length }})</div>
             <ng-container *ngFor="let person of data.items">
                 <div><button (click)=select(person)>Select</button>{{ person | json }}</div>
             </ng-container>

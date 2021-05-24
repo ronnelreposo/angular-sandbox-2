@@ -2,7 +2,17 @@ import { createReducer, on } from '@ngrx/store';
 import * as _ from 'lodash';
 import { AppState, initialState, Person } from './app-state';
 import * as actions from './actions';
+import { fill } from 'lodash';
 
+
+// helper function.
+function fillArray<T>(value:T, len: number, mapperFunc: (x: T, i: number) => T): T[] {
+  var arr = [];
+  for (var i = 0; i < len; i++) {
+    arr.push(mapperFunc(value, i));
+  }
+  return arr;
+}
 
 const _appReducer = createReducer(
     initialState,
@@ -46,14 +56,18 @@ const _appReducer = createReducer(
             { name: 'Nicolás', email: 'nicole@email.com', age: 43, country: 'Colombia', status: 'Inactive' }
         ];
 
-        console.log('[reducer] loaditems', appState)
+        // duplicate items.
+        const replicationCount = 200;
+        const duplicatedPeopleInit = _.flatMap(people, x => fillArray(x, replicationCount, (p, n) => ({ ...p, name: `${p.name}_${n}` })));
+
+        // console.log('[reducer] loaditems', appState)
 
         return {
             ...appState,
             customSelect: {
                 ...appState.customSelect,
                 groupValue: 'all',
-                items: people
+                items: duplicatedPeopleInit
             }
         };
     }),
@@ -115,6 +129,16 @@ const _appReducer = createReducer(
             customSelect: {
                 ...appState.customSelect,
                 selectedNames: allActiveNames,
+            }
+        };
+    }),
+    on(actions.clearAllSelected, (appState: AppState): AppState => {
+
+        return {
+            ...appState,
+            customSelect: {
+                ...appState.customSelect,
+                selectedNames: [],
             }
         };
     }),

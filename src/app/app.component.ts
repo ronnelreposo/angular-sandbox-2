@@ -80,7 +80,7 @@ const customSelectSelector = createSelector(
   selectItems, selectSearchKey, selectSelectedNames, selectGroupValue,
     (items, searchKey, names, selectedGroupValue): Data => {
 
-        console.log('[selector]', { searchKey, names, selectedGroupValue })
+        // console.log('[selector]', { searchKey, names, selectedGroupValue })
 
       const selectedItems = lookup(items, names);
 
@@ -181,5 +181,10 @@ export class AppComponent implements OnInit {
   public addAllActive() {
 
     this.store.dispatch(actions.addAllActive());
+  }
+
+  public clearAllSelected() {
+
+    this.store.dispatch(actions.clearAllSelected());
   }
 }
