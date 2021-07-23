@@ -6,10 +6,13 @@ import {
   OnInit
 } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
+import { Store } from '@ngrx/store';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
 import { User } from '../app.component';
+import { valueChange } from '../store/actions';
+import { AppState } from '../store/app-state';
 
 @Component({
   selector: 'app-my-form',
@@ -21,11 +24,12 @@ export class MyFormComponent implements OnInit, OnDestroy {
   @Input() user: User;
   userForm: FormGroup;
 
-  @Input() pushUserChange: Subject<User>;
-
   private destroy$: Subject<void>;
 
-  constructor(private fb: FormBuilder) {
+  constructor
+    ( private fb: FormBuilder
+    , private store: Store<{ appState: AppState }>
+  ) {
 
     // console.log("[form component] constructor user id of: ", this.user.id);
   }
@@ -46,9 +50,11 @@ export class MyFormComponent implements OnInit, OnDestroy {
 
     this.userForm = constructUserFormGroup(this.user);
 
+    // Push changes to the store.
     this.userForm.valueChanges
     .pipe(takeUntil(this.destroy$))
-    .subscribe(user => this.pushUserChange.next(user));
+    .subscribe(user =>
+      this.store.dispatch(valueChange({ changedUser: user })));
   }
 
   ngOnDestroy() {

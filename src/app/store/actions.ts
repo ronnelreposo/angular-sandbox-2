@@ -23,4 +23,5 @@ export const loadItems = createAction(_actions.loadItems);
 export const loadItemsSucceed = createAction(_actions.loadItemsSucceed,
     props<{ users: immutable.List<User> }>());
 export const loadItemsFailed = createAction(_actions.loadItemsFailed);
-export const valueChange = createAction(_actions.valueChanges, props<{ changedUser: User }>());
+export const valueChange = createAction(_actions.valueChanges,
+    props<{ changedUser: User }>());

@@ -11,6 +11,6 @@
 
 
   <ng-container *ngFor="let user of (users$ | async); trackBy: trackFunc">
-    <app-my-form [user]="user" [pushUserChange]="userLocalChanges$"></app-my-form>
+    <app-my-form [user]="user"></app-my-form>
   </ng-container>
 </div>

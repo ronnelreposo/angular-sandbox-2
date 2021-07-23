@@ -2,8 +2,17 @@ import { createReducer, on } from '@ngrx/store';
 import * as _ from 'lodash';
 import { AppState, initialState } from './app-state';
 import * as actions from './actions';
+import * as immutable from 'immutable';
+import { User } from '../app.component';
 
-
+const updateUserOnLookup = (usersSource: immutable.List<User>, changedUser: User) => {
+    return usersSource.update(
+        usersSource.findIndex(
+            user => user.id === changedUser.id
+        ),
+        user => changedUser
+    );
+};
 const _appReducer = createReducer(
     initialState,
 
@@ -21,9 +30,17 @@ const _appReducer = createReducer(
         return appState;
     }),
 
-    on(actions.valueChange, (appState: AppState): AppState => {
+    on(actions.valueChange,
+        (appState: AppState, { changedUser: changedUser }): AppState => {
 
-        return appState;
+        const updatedUsers = updateUserOnLookup(
+            appState.users, changedUser
+        );
+
+        return {
+            ...appState,
+            users: updatedUsers
+        }
     }),
 
 );
