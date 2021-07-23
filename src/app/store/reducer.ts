@@ -5,13 +5,15 @@ import * as actions from './actions';
 import * as immutable from 'immutable';
 import { User } from '../app.component';
 
-const updateUserOnLookup = (usersSource: immutable.List<User>, changedUser: User) => {
-    return usersSource.update(
-        usersSource.findIndex(
-            user => user.id === changedUser.id
-        ),
-        user => changedUser
-    );
+const updateUserOnLookup = (usersSource: User[], changedUser: User) => {
+
+    return usersSource.map(user => {
+        if (user.id === changedUser.id) {
+            return changedUser;
+        } else {
+            return user;
+        }
+    });
 };
 const _appReducer = createReducer(
     initialState,

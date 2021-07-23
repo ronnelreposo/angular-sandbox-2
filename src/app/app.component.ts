@@ -17,7 +17,7 @@ export type User = { id: number; name: string; phone: string };
 })
 export class AppComponent implements OnInit, OnDestroy {
 
-  public users$: Observable<immutable.List<User>>;
+  public users$: Observable<User[]>;
 
   public load$: Subject<void>;
   count = 0;

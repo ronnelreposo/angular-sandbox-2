@@ -25,7 +25,7 @@ export class AppEffects {
             ofType(actions.loadItems),
             switchMapTo(remoteUsers$),
             map(users =>
-                actions.loadItemsSucceed({ users: immutable.List(users) }))
+                actions.loadItemsSucceed({ users: users }))
         );
     });
 }

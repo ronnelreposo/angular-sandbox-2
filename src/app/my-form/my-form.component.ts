@@ -41,6 +41,7 @@ export class MyFormComponent implements OnInit, OnDestroy {
     this.destroy$ = new Subject();
 
     const constructUserFormGroup = (user: User): FormGroup => {
+      console.log("[form component] (OnInit->constructing form) user id of: ", this.user.id);
       return this.fb.group({
         id: [user.id],
         name: [user.name],
