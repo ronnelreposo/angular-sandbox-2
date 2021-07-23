@@ -1,119 +1,12 @@
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit } from '@angular/core';
 import * as _ from 'lodash';
-import * as actions from './store/actions';
+import { merge, Observable, Subject } from 'rxjs';
+import * as immutable from 'immutable';
+import { FormBuilder } from '@angular/forms';
+import { map, shareReplay, switchMap, takeUntil, tap, withLatestFrom } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
 
-
-
-import { createSelector, createFeatureSelector, Store, select } from "@ngrx/store";
-import { AppState, Compute, Groupings, Person } from './store/app-state';
-import { Observable, pipe } from 'rxjs';
-import { map, startWith, tap } from 'rxjs/operators';
-import { identity } from 'lodash';
-import { defaultContext, SelectContext, selectEngine } from './custom-select';
-
-// Select Top Level Feature States.
-const computeFeatureSelector = createFeatureSelector<AppState, Compute>("compute");
-const counterFeatureSelector = createFeatureSelector<AppState, AppState['counter']>("counter");
-
-// const computeSelector = createSelector(
-//   counterFeatureSelector,
-//   computeFeatureSelector,
-//   (counter, compute) => compute.result.reduce((a, b) => a + b, 0)
-// );
-
-
-
-
-// Without feature selector =================================================================
-
-// // Select Top Level States.
-const selectCounter = (appState: AppState) => appState.counter;
-const selectCompute = (appState: AppState) => appState.compute;
-
-const computeSelector = createSelector(selectCounter, selectCompute, (counter, compute) => {
-
-  // process data for view.
-  return compute.result.reduce((a, b) => a + b, 0);
-});
-
-
-
-
-
-type Data = {
-  items: Person[]
-  selectedItems: Person[]
-}
-
-const selectItems = (appState: AppState) => appState.customSelect.items;
-const selectSearchKey = (appState: AppState) => appState.customSelect.searchKeyword;
-const selectSelectedNames = (appState: AppState) => appState.customSelect.selectedNames;
-const selectGroupValue = (appState: AppState) => appState.customSelect.groupValue;
-
-// lookup function
-const lookup = (people: Person[], names: string[]) => {
-
-  return _.flatMap(people, person => {
-    return _.flatMap(names, name => {
-      return (person.name === name) ? [person] : []
-    })
-  });
-};
-// helper functions
-const flat = (xs: Person[] | _.Dictionary<Person[]>): Person[] => {
-  if (xs instanceof Array) {
-    return xs;
-  } else {
-    return  _.flatMap(xs, x => x);
-  }
-};
-const toGroupValue = (groupCode: Groupings) => {
-
-  switch (groupCode) {
-    case 'all': { return '' }
-    case 'active': { return 'Active' }
-    case 'inactive': { return 'Inactive' }
-  }
-}
-  
-const customSelectSelector = createSelector(
-  selectItems, selectSearchKey, selectSelectedNames, selectGroupValue,
-    (items, searchKey, names, selectedGroupValue): Data => {
-
-        console.log('[selector]', { searchKey, names, selectedGroupValue })
-
-      const selectedItems = lookup(items, names);
-
-      const context: SelectContext<Person> = {
-        ...defaultContext(),
-        sourceItems: items,
-        selectedItems: selectedItems,
-        
-      };
-
-    const processedItems = (searchKey === '')
-
-      // EMPTY Search Criteria
-      ? selectEngine({
-        ...context,
-        searchFunc: (person, groupKey) => selectedGroupValue === 'all'? true : person[groupKey] === toGroupValue(selectedGroupValue)
-      }, 'status')
-
-      // NON-EMPTY Search Criteria
-      : selectEngine({
-        ...context,
-        searchFunc: (person, groupKey) => {
-
-          const isSearchedInName = person.name.includes(searchKey);
-          return (selectedGroupValue === 'all') ? isSearchedInName : isSearchedInName && person[groupKey] === toGroupValue(selectedGroupValue); 
-        }
-      }, 'status');
-
-    return {
-      items: flat(processedItems), // flatten for now
-      selectedItems: selectedItems,
-    };
-  });
+export type User = { id: number; name: string; phone: string };
 
 @Component({
   selector: 'app-root',
@@ -121,60 +14,80 @@ const customSelectSelector = createSelector(
   styleUrls: ['./app.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
 
-  // computeResult$: Observable<number[]>
-  computeResult$: Observable<any>
+  users$: Observable<immutable.List<User>>;
 
-  public data$: Observable<Data>;
+  load$: Subject<void>;
+  count = 0;
 
-  constructor(private store: Store<{ appState: AppState }>) {
-    
+  private store$: Subject<immutable.List<User>>;
+  // push changes.
+  public userLocalChanges$: Subject<User>;
+
+  private destroy$: Subject<void>;
+
+  constructor(private httpClient: HttpClient) {}
+
+  ngOnDestroy(): void {
+
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
-  ngOnInit() {
-
-    // this.computeResult$ = this.store.pipe(
-    //   map(({ appState }) => appState),
-    //   tap(x => console.log('[before selector] compute result: ', x)),
-    //   select(computeSelector),
-    //   tap(x => console.log('[after selector] compute result: ', x)),
-    //   );
-
-    this.data$ = this.store.pipe(
-      map(({ appState }) => appState),
-      select(customSelectSelector)
-    );
-  }
-
-
-  public compute() {
-
-    this.store.dispatch(actions.computeAction({ kind: 'compute' }));
-  }
-
-  public select(person: Person) {
-
-    this.store.dispatch(actions.addItems({ names: [person.name] }));
-  }
+  ngOnInit(): void {
   
-  public remove(person: Person) {
+    this.load$ = new Subject();
+    this.store$ = new Subject();
+    this.userLocalChanges$ = new Subject<User>();
+    this.destroy$ = new Subject();
 
-    this.store.dispatch(actions.removeItems({ names: [person.name] }));
+    // query API.
+    const remoteUsers$ = this.load$.pipe(
+      switchMap(() => {
+        // API Query.
+        const users$: Observable<User[]> = this.httpClient.get<
+          User[]
+        >('https://jsonplaceholder.typicode.com/users');
+        return users$;
+      }),
+      map(xs => immutable.List(xs))
+      // tap(x => console.log('api'))
+    );
+
+    // Update Local User.
+    const updatedStore$ = this.userLocalChanges$.pipe(
+      withLatestFrom(this.store$),
+      map(([userLocalChange, storedUsers]) => {
+        // update user.
+        return storedUsers.update(
+          storedUsers.findIndex(
+            storedUser => storedUser.id === userLocalChange.id
+          ),
+          storedUser => userLocalChange
+        );
+      }),
+      // tap(xs => console.log('user changes'))
+    );
+
+    // Merge Remote and Local Updates
+    this.users$ = merge(remoteUsers$, updatedStore$).pipe(shareReplay());
+
+    // push changes to the store.
+    this.users$
+    .pipe(takeUntil(this.destroy$))
+    .subscribe(xs => this.store$.next(xs));
   }
 
-  public loadItems() {
-
-    this.store.dispatch(actions.loadItems({ kind: 'load-items'}));
+  traceRendering(view: string) {
+    console.log('render' + view);
   }
 
-  public search(value: any) {
-
-    this.store.dispatch(actions.search({ searchKeyword: value }));
+  increment() {
+    this.count++;
   }
 
-  public selectGroup(group: Groupings) {
-
-    this.store.dispatch(actions.group({ groupValue: group }));
+  trackFunc(index, user: User) {
+    return user.id;
   }
 }

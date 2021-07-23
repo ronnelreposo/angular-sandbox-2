@@ -9,18 +9,25 @@ import { StoreModule } from '@ngrx/store';
 import { appReducer } from './store/reducer';
 import { EffectsModule } from '@ngrx/effects';
 import { AppEffects } from './store/effects';
+import { MyFormComponent } from './my-form/my-form.component';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
 
 @NgModule({
   declarations: [
     AppComponent,
-    MainComponent
+    MainComponent,
+    MyFormComponent
   ],
   imports: [
     BrowserModule,
     AppRoutingModule,
     BrowserAnimationsModule,
     StoreModule.forRoot({ appState: appReducer }),
-    EffectsModule.forRoot([AppEffects])
+    EffectsModule.forRoot([AppEffects]),
+    FormsModule,
+    ReactiveFormsModule,
+    HttpClientModule,
   ],
   providers: [],
   bootstrap: [AppComponent]

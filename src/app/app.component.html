@@ -1,38 +1,16 @@
-<router-outlet></router-outlet>
+<div>Forms Change Detection</div>
 
-<div>
+<div style="margin-top: 30px">
+  <div style="margin-top: 30px">
+    <span>counter: {{ count }}</span>
+    <button (click)="increment()">Increment</button>
+  </div>
+  <div style="margin-top: 30px">
+    <button (click)="load$.next()">Load</button>
+  </div>
 
-    <div>
-        <button (click)="loadItems()">Load Items</button>
-    </div>
 
-    <div>
-        <input type="search" (input)="search($event.target.value)" />
-    </div>
-
-    <div>
-        <button (click)="selectGroup('all')">All</button>
-        <button (click)="selectGroup('active')">Active User</button>
-        <button (click)="selectGroup('inactive')">Non Active User</button>
-    </div>
-
-    <ng-container *ngIf="data$ | async as data">
-
-        <!-- Selected Items-->
-        <div class="card">
-            <div>Selected Items</div>
-            <ng-container *ngFor="let person of data.selectedItems">
-                <div><button (click)=remove(person)>Remove</button>{{ person | json }}</div>
-            </ng-container>
-        </div>
-
-        <!-- Items-->
-        <div class="card">
-            <div>Items</div>
-            <ng-container *ngFor="let person of data.items">
-                <div><button (click)=select(person)>Select</button>{{ person | json }}</div>
-            </ng-container>
-        </div>
-    </ng-container>
-
+  <ng-container *ngFor="let user of (users$ | async); trackBy: trackFunc">
+    <app-my-form [user]="user" [pushUserChange]="userLocalChanges$"></app-my-form>
+  </ng-container>
 </div>
