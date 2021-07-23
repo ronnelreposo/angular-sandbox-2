@@ -1,43 +1,26 @@
 import { createAction, props } from "@ngrx/store";
-import { Action } from "rxjs/internal/scheduler/Action";
-import { Groupings, Person } from "./app-state";
+import { User } from "../app.component";
+import * as immutable from 'immutable';
 
 
 // export type IncrementAction = 'increment-counter';
 // export type ComputeAction = 'compute';
 
 type Actions = {
-    incrementAction: 'increment-counter',
-    computeAction: 'compute',
-    customSelectActions: {
-        loadItems: '[custom-select] load items',
-        addItems: '[custom-select] add-items',
-        removeItems: '[custom-select] remove-items',
-        search: '[custom-select] search',
-        group: '[custom-select] group'
-    }
+    loadItems: 'load items',
+    loadItemsSucceed: 'load items: failed',
+    loadItemsFailed: 'load items: succeed',
+    valueChanges: 'value change' 
 }
 export const _actions: Actions = {
-
-    incrementAction: 'increment-counter',
-    computeAction: 'compute',
-    customSelectActions: {
-        loadItems: '[custom-select] load items',
-        addItems: '[custom-select] add-items',
-        removeItems: '[custom-select] remove-items',
-        search: '[custom-select] search',
-        group: '[custom-select] group'
-    }
+    loadItems: 'load items',
+    loadItemsSucceed: 'load items: failed',
+    loadItemsFailed: 'load items: succeed',
+    valueChanges: 'value change' 
 };
 
-
-export const incrementCounterAction = createAction(_actions.incrementAction, props<{ kind: 'increment' }>());
-
-export const computeAction = createAction(_actions.computeAction, props<{ kind: 'compute' }>());
-
-// Custom Select Action.
-export const loadItems = createAction(_actions.customSelectActions.loadItems, props<{kind: 'load-items'}>());
-export const addItems = createAction(_actions.customSelectActions.addItems, props<{ names: Person['name'][] }>()); // assumed to be unique.
-export const removeItems = createAction(_actions.customSelectActions.removeItems, props<{ names: Person['name'][] }>()); // assumed to be unique.
-export const search = createAction(_actions.customSelectActions.search, props<{ searchKeyword: string }>());
-export const group = createAction(_actions.customSelectActions.group, props<{ groupValue: Groupings }>()); // string for now.
+export const loadItems = createAction(_actions.loadItems);
+export const loadItemsSucceed = createAction(_actions.loadItemsSucceed,
+    props<{ users: immutable.List<User> }>());
+export const loadItemsFailed = createAction(_actions.loadItemsFailed);
+export const valueChange = createAction(_actions.valueChanges, props<{ changedUser: User }>());

@@ -1,10 +1,13 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit } from '@angular/core';
 import * as _ from 'lodash';
-import { merge, Observable, Subject } from 'rxjs';
+import { identity, merge, Observable, Subject } from 'rxjs';
 import * as immutable from 'immutable';
 import { FormBuilder } from '@angular/forms';
 import { map, shareReplay, switchMap, takeUntil, tap, withLatestFrom } from 'rxjs/operators';
 import { HttpClient } from '@angular/common/http';
+import { createSelector, select, Store } from '@ngrx/store';
+import { AppState } from './store/app-state';
+import { loadItems } from './store/actions';
 
 export type User = { id: number; name: string; phone: string };
 
@@ -27,7 +30,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private destroy$: Subject<void>;
 
-  constructor(private httpClient: HttpClient) {}
+  constructor(private store: Store<{appState: AppState}>) {}
 
   ngOnDestroy(): void {
 
@@ -42,17 +45,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.userLocalChanges$ = new Subject<User>();
     this.destroy$ = new Subject();
 
-    // query API.
-    const remoteUsers$ = this.load$.pipe(
-      switchMap(() => {
-        // API Query.
-        const users$: Observable<User[]> = this.httpClient.get<
-          User[]
-        >('https://jsonplaceholder.typicode.com/users');
-        return users$;
-      }),
-      map(xs => immutable.List(xs))
-      // tap(x => console.log('api'))
+    const selectUser = (appState: AppState) => appState.users;
+    const userSelector = createSelector(selectUser, identity);
+    const remoteUsers$ = this.store.pipe(
+      map(({ appState }) => appState),
+      select(userSelector)
     );
 
     // Update Local User.
@@ -77,6 +74,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.users$
     .pipe(takeUntil(this.destroy$))
     .subscribe(xs => this.store$.next(xs));
+
+    // Dispatch load items.
+    this.load$
+    .pipe(takeUntil(this.destroy$))
+    .subscribe(() => {
+
+      this.store.dispatch(loadItems());
+    });
   }
 
   traceRendering(view: string) {

@@ -48,9 +48,7 @@ export class MyFormComponent implements OnInit, OnDestroy {
 
     this.userForm.valueChanges
     .pipe(takeUntil(this.destroy$))
-    .subscribe(user => {
-      this.pushUserChange.next(user);
-    });
+    .subscribe(user => this.pushUserChange.next(user));
   }
 
   ngOnDestroy() {
