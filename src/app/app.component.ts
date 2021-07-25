@@ -2,10 +2,36 @@ import { Component, OnInit } from '@angular/core';
 import { from, interval, of, Subject } from 'rxjs';
 import * as vector from './core/vector';
 import { Vector } from './core/vector';
-import { scan, switchMap, switchMapTo, take } from 'rxjs/operators';
-import { takeWhile, tap } from 'lodash';
+import { scan, startWith, switchMapTo, take } from 'rxjs/operators';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
-import { mapToMapExpression } from '@angular/compiler/src/render3/util';
+
+type LocationAndVelocity = { location: Vector, velocity: Vector }
+
+const alignCenterBall = (x: number, radius: number) => x - radius;
+
+const mapOnEdge = (width: number, height: number, radius: number) =>
+  ({ x, y }: Vector): Vector => {
+
+  const xPrime = (x > width) ? 0 : (x < 0) ? width : x;
+  const yPrime = (y > height) ? 0 : (y < 0) ? height : y;
+
+  return {
+    x: xPrime,
+    y: yPrime
+  }
+};
+
+const limit = (maxMagnitude: number) => (velocity: Vector, accelaration: Vector) => {
+
+  if (vector.magnitude(velocity) > maxMagnitude) {
+
+    return velocity;
+  } else {
+
+    return vector.add(velocity)(accelaration);
+  }
+
+};
 
 @Component({
   selector: 'app-root',
@@ -27,30 +53,51 @@ export class AppComponent implements OnInit {
     const ballRadiusInPx = 25;
     const widthInPx = 800;
     const heightInPx = 400;
+    const topSpeed = 2;
 
-    const initialVector = { x: 50, y: 50 };;
-    const velocity: Vector = { x: 1, y: 1 };
+    const initialLocation: Vector = {
+      x: widthInPx / 2,
+      y: heightInPx / 2
+    };
 
-    const alignCenterBall = (x: number) => x - ballRadiusInPx;
+    const initialVelocity: Vector = { x: 0, y: 0 };
+    const acceleration: Vector = { x: -0.001, y: 0.01 };
+    const initialLocationAndVelocity: LocationAndVelocity = {
+      location: initialLocation,
+      velocity: initialVelocity
+    };
   
     const vector$ = interval(1, animationFrame)
       .pipe(
-        // take(500),
+        // take(1000),
         // vector in motion
-        scan((vectorAcc, _) => {
+        scan(({ location, velocity }, _) => {
 
-            return vector.add(vectorAcc)(velocity);
-        }, initialVector)
+            const mappedLocation = mapOnEdge(widthInPx, heightInPx, ballRadiusInPx)
+              (location);
+
+            // Magnitude of velocity could accelrate at a constant speed, we limit it.
+            const velocityWithAcceleration = limit(topSpeed)(velocity, acceleration);
+            const locationVectorPrime = vector.add(mappedLocation)(velocityWithAcceleration);
+
+            const locationAndVelocity: LocationAndVelocity = {
+              location: locationVectorPrime,
+              velocity: velocityWithAcceleration
+            };
+
+            return locationAndVelocity;
+        }, initialLocationAndVelocity),
+        startWith(initialLocationAndVelocity)
       )
 
     const onMove$ = this.move$.pipe(
         switchMapTo(vector$)
     );
     
-    onMove$.subscribe(({ x, y }) => {
+    onMove$.subscribe(({ location: {x, y}, velocity}) => {
 
-      ball.style.left = alignCenterBall(x) + 'px';
-      ball.style.top = alignCenterBall(y) + 'px';
+      ball.style.left = alignCenterBall(x, ballRadiusInPx) + 'px';
+      ball.style.top = alignCenterBall(y, ballRadiusInPx) + 'px';
     });
   }
 }
