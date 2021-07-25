@@ -45,10 +45,10 @@ export const magnitude = ({ x, y }: Vector): number => {
     return Math.sqrt(square(x) + square(y))
 }
 
-export const normalize = (vector: Vector): { kind: 'fail' } | Vector => {
+export const normalize = (vector: Vector): Vector => {
     const vectorMagnitude = magnitude(vector);
     if(vectorMagnitude == 0) {
-        return { kind: 'fail' }
+        return vector;
     }
     else {
         return divide(vectorMagnitude)(vector);
