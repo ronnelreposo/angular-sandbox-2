@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { from, interval, of, Subject } from 'rxjs';
+import { from, fromEvent, interval, of, Subject } from 'rxjs';
 import * as vector from './core/vector';
 import { Vector } from './core/vector';
-import { scan, startWith, switchMapTo, take } from 'rxjs/operators';
+import { map, scan, startWith, switchMap, take, tap } from 'rxjs/operators';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type LocationAndVelocity = { location: Vector, velocity: Vector }
@@ -49,32 +49,40 @@ export class AppComponent implements OnInit {
 
     this.move$ = new Subject();
 
+    const mouseMove$ = fromEvent<MouseEvent>(document, 'click')
+      .pipe(
+        map(mouseEv => ({ x: mouseEv.clientX, y: mouseEv.clientY })),
+      );
+
     const ball = document.getElementById('ball');
     const ballRadiusInPx = 25;
     const widthInPx = 800;
     const heightInPx = 400;
-    const topSpeed = 2;
+    const topSpeed = 10;
+
+    const random = (min: number, max: number) => Math.floor(Math.random() * (max - min)) + min;
 
     const initialLocation: Vector = {
-      x: widthInPx / 2,
-      y: heightInPx / 2
+      x: random(0, widthInPx),
+      y: random(0, heightInPx)
     };
 
     const initialVelocity: Vector = { x: 0, y: 0 };
-    const acceleration: Vector = { x: -0.001, y: 0.01 };
     const initialLocationAndVelocity: LocationAndVelocity = {
       location: initialLocation,
       velocity: initialVelocity
     };
   
-    const vector$ = interval(1, animationFrame)
+    const vector$ = (mouseVector: Vector) => interval(1, animationFrame)
       .pipe(
-        // take(1000),
-        // vector in motion
         scan(({ location, velocity }, _) => {
 
             const mappedLocation = mapOnEdge(widthInPx, heightInPx, ballRadiusInPx)
               (location);
+
+            const direction = vector.subtract(mouseVector)(mappedLocation);
+            const directionNormalized = vector.normalize(direction);
+            const acceleration = vector.multiply(0.01)(directionNormalized);
 
             // Magnitude of velocity could accelrate at a constant speed, we limit it.
             const velocityWithAcceleration = limit(topSpeed)(velocity, acceleration);
@@ -90,8 +98,8 @@ export class AppComponent implements OnInit {
         startWith(initialLocationAndVelocity)
       )
 
-    const onMove$ = this.move$.pipe(
-        switchMapTo(vector$)
+    const onMove$ = mouseMove$.pipe(
+        switchMap(vector$)
     );
     
     onMove$.subscribe(({ location: {x, y}, velocity}) => {
