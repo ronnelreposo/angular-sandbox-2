@@ -57,3 +57,11 @@ export const normalize = (vector: Vector): Vector => {
 
 // Util =================================================================
 const square = (x: number): number => x * x;
+
+export const random2D = (): Vector => {
+
+    return normalize({
+        x: Math.floor(Math.random() * 10),
+        y: Math.floor(Math.random() * 10)
+    })
+};

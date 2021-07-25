@@ -76,8 +76,11 @@ export class AppComponent implements OnInit {
             const mappedLocation = mapOnEdge(widthInPx, heightInPx, ballRadiusInPx)
               (location);
 
+            const scale = Math.random();
+            const randomAcceleration = vector.multiply(scale)(vector.random2D());
+
             // Magnitude of velocity could accelrate at a constant speed, we limit it.
-            const velocityWithAcceleration = limit(topSpeed)(velocity, acceleration);
+            const velocityWithAcceleration = limit(topSpeed)(velocity, randomAcceleration);
             const locationVectorPrime = vector.add(mappedLocation)(velocityWithAcceleration);
 
             const locationAndVelocity: LocationAndVelocity = {
