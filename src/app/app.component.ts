@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { from, fromEvent, interval, of, Subject } from 'rxjs';
+import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { from, fromEvent, interval, Observable, of, Subject } from 'rxjs';
 import * as vector from './core/vector';
 import { Vector } from './core/vector';
 import { map, scan, startWith, switchMap, take, tap } from 'rxjs/operators';
@@ -36,12 +36,14 @@ const limit = (maxMagnitude: number) => (velocity: Vector, accelaration: Vector)
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+  styleUrls: ['./app.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppComponent implements OnInit {
   title = 'angular-sandbox';
 
   public move$: Subject<void>;
+  public particles$: Observable<Vector[]>;
 
   constructor() { }
 
@@ -54,58 +56,79 @@ export class AppComponent implements OnInit {
         map(mouseEv => ({ x: mouseEv.clientX, y: mouseEv.clientY })),
       );
 
-    const ball = document.getElementById('ball');
     const ballRadiusInPx = 25;
-    const widthInPx = 800;
-    const heightInPx = 400;
+    const widthInPx = 1400;
+    const heightInPx = 1000;
     const topSpeed = 10;
 
-    const random = (min: number, max: number) => Math.floor(Math.random() * (max - min)) + min;
+    const random = (min: number, max: number) =>
+      Math.floor(Math.random() * (max - min)) + min;
 
-    const initialLocation: Vector = {
-      x: random(0, widthInPx),
-      y: random(0, heightInPx)
-    };
+    const particleVectors = [
+      { x: random(0, widthInPx), y: random(0, heightInPx) },
+      { x: random(0, widthInPx), y: random(0, heightInPx) },
+      { x: random(0, widthInPx), y: random(0, heightInPx) }
+    ];
 
     const initialVelocity: Vector = { x: 0, y: 0 };
-    const initialLocationAndVelocity: LocationAndVelocity = {
-      location: initialLocation,
-      velocity: initialVelocity
+    
+    const initialLocationsAndVelocities: LocationAndVelocity[] = particleVectors
+    .map(particleVector => ({ location: particleVector, velocity: initialVelocity }));
+
+    const move = (targetVector: Vector, location: Vector, velocity: Vector): LocationAndVelocity => {
+
+      const mappedLocation = mapOnEdge(widthInPx, heightInPx, ballRadiusInPx)
+        (location);
+
+      const direction = vector.subtract(targetVector)(mappedLocation);
+      const directionNormalized = vector.normalize(direction);
+      const acceleration = vector.multiply(0.1)(directionNormalized);
+
+      // Magnitude of velocity could accelerate at a constant speed, we limit it.
+      const velocityWithAcceleration = limit(topSpeed)(velocity, acceleration);
+      const locationVectorPrime = vector.add(mappedLocation)(velocityWithAcceleration);
+
+      const locationAndVelocity: LocationAndVelocity = {
+        location: locationVectorPrime,
+        velocity: velocityWithAcceleration
+      };
+
+      return locationAndVelocity;
     };
   
     const vector$ = (mouseVector: Vector) => interval(1, animationFrame)
       .pipe(
-        scan(({ location, velocity }, _) => {
+        scan((locationsAndVelocities, _) => {
 
-            const mappedLocation = mapOnEdge(widthInPx, heightInPx, ballRadiusInPx)
-              (location);
+          return locationsAndVelocities
+            .map(({ location, velocity }) =>
+              move(mouseVector, location, velocity));
 
-            const direction = vector.subtract(mouseVector)(mappedLocation);
-            const directionNormalized = vector.normalize(direction);
-            const acceleration = vector.multiply(0.01)(directionNormalized);
-
-            // Magnitude of velocity could accelrate at a constant speed, we limit it.
-            const velocityWithAcceleration = limit(topSpeed)(velocity, acceleration);
-            const locationVectorPrime = vector.add(mappedLocation)(velocityWithAcceleration);
-
-            const locationAndVelocity: LocationAndVelocity = {
-              location: locationVectorPrime,
-              velocity: velocityWithAcceleration
-            };
-
-            return locationAndVelocity;
-        }, initialLocationAndVelocity),
-        startWith(initialLocationAndVelocity)
+        }, initialLocationsAndVelocities),
+        startWith(initialLocationsAndVelocities)
       )
 
     const onMove$ = mouseMove$.pipe(
         switchMap(vector$)
     );
-    
-    onMove$.subscribe(({ location: {x, y}, velocity}) => {
 
-      ball.style.left = alignCenterBall(x, ballRadiusInPx) + 'px';
-      ball.style.top = alignCenterBall(y, ballRadiusInPx) + 'px';
-    });
+    this.particles$ = onMove$.pipe(map(locationsAndVelocities => {
+
+      return locationsAndVelocities
+        .map(({ location: {x, y}, velocity}) => {
+
+          // render center ball.
+          return {
+            x: alignCenterBall(x, ballRadiusInPx),
+            y: alignCenterBall(y, ballRadiusInPx)
+          };
+        });
+
+    }));
+  }
+
+  trackByFunc(index, _) {
+
+    return index;
   }
 }

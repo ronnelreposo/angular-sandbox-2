@@ -1,3 +1,10 @@
 <div id="fence">
-  <div id="ball" style="position:absolute;">
+  <ng-container *ngIf="(particles$ | async) as particles">
+    <ng-container *ngFor="let particle of particles; trackBy: trackByFunc">
+      <div id="ball" style="position:absolute;"
+        [style.left.px]="particle.x"
+        [style.top.px]="particle.y">
+      </div>
+    </ng-container>
+  </ng-container>
 </div>
