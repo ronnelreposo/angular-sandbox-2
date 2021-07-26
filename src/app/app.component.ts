@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { from, fromEvent, interval, of, Subject } from 'rxjs';
+import { combineLatest, EMPTY, from, fromEvent, interval, merge, Observable, of, Subject } from 'rxjs';
 import * as vector from './core/vector';
 import { Vector } from './core/vector';
-import { map, scan, startWith, switchMap, take, tap } from 'rxjs/operators';
+import { map, mapTo, scan, startWith, switchMap, take, takeUntil, tap, withLatestFrom } from 'rxjs/operators';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type LocationAndVelocity = { location: Vector, velocity: Vector }
@@ -33,6 +33,21 @@ const limit = (maxMagnitude: number) => (velocity: Vector, accelaration: Vector)
 
 };
 
+const applyForce = (acceleration: Vector) => (force: Vector) => {
+
+  return vector.add(acceleration)(force)
+}
+
+const fromMouseEvent = (eventType: string): Observable<Vector> => {
+
+  return fromEvent<MouseEvent>(document, eventType)
+      .pipe(
+        map<MouseEvent, Vector>(mouseEv =>
+          ({ x: mouseEv.clientX, y: mouseEv.clientY })),
+      );
+};
+
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -49,22 +64,21 @@ export class AppComponent implements OnInit {
 
     this.move$ = new Subject();
 
-    const mouseMove$ = fromEvent<MouseEvent>(document, 'click')
-      .pipe(
-        map(mouseEv => ({ x: mouseEv.clientX, y: mouseEv.clientY })),
-      );
+    const frames$ = interval(1, animationFrame);
+
+    const mouseDown$ = fromMouseEvent('mousedown');
 
     const ball = document.getElementById('ball');
     const ballRadiusInPx = 25;
-    const widthInPx = 800;
-    const heightInPx = 400;
-    const topSpeed = 10;
+    const widthInPx = 1400;
+    const heightInPx = 1000;
+    const topSpeed = 1;
 
     const random = (min: number, max: number) => Math.floor(Math.random() * (max - min)) + min;
 
     const initialLocation: Vector = {
-      x: random(0, widthInPx),
-      y: random(0, heightInPx)
+      x: widthInPx / 2,
+      y: heightInPx / 2
     };
 
     const initialVelocity: Vector = { x: 0, y: 0 };
@@ -73,19 +87,23 @@ export class AppComponent implements OnInit {
       velocity: initialVelocity
     };
   
-    const vector$ = (mouseVector: Vector) => interval(1, animationFrame)
+    const vector$ = (targetVector: Vector) => frames$
       .pipe(
         scan(({ location, velocity }, _) => {
 
             const mappedLocation = mapOnEdge(widthInPx, heightInPx, ballRadiusInPx)
               (location);
 
-            const direction = vector.subtract(mouseVector)(mappedLocation);
+            const direction = vector.subtract(targetVector)(mappedLocation);
             const directionNormalized = vector.normalize(direction);
-            const acceleration = vector.multiply(0.01)(directionNormalized);
+            const acceleration = vector.multiply(0.1)(directionNormalized);
+
+            const wind: Vector = { x: 0.5, y: 0 };
+            // apply forces to acceleration.
+            const appliedWindAcceleration = applyForce(acceleration)(wind);
 
             // Magnitude of velocity could accelrate at a constant speed, we limit it.
-            const velocityWithAcceleration = limit(topSpeed)(velocity, acceleration);
+            const velocityWithAcceleration = limit(topSpeed)(velocity, appliedWindAcceleration);
             const locationVectorPrime = vector.add(mappedLocation)(velocityWithAcceleration);
 
             const locationAndVelocity: LocationAndVelocity = {
@@ -98,11 +116,13 @@ export class AppComponent implements OnInit {
         startWith(initialLocationAndVelocity)
       )
 
-    const onMove$ = mouseMove$.pipe(
-        switchMap(vector$)
+    const target$ = mouseDown$;
+
+    const combined$ = target$.pipe(
+        switchMap((target) => vector$(target))
     );
     
-    onMove$.subscribe(({ location: {x, y}, velocity}) => {
+    combined$.subscribe(({ location: {x, y}, velocity}) => {
 
       ball.style.left = alignCenterBall(x, ballRadiusInPx) + 'px';
       ball.style.top = alignCenterBall(y, ballRadiusInPx) + 'px';
