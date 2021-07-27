@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { fromEvent, interval, Observable, Subject } from 'rxjs';
 import * as vector from './core/vector';
 import { Vector } from './core/vector';
-import { map, scan, startWith, switchMap, tap } from 'rxjs/operators';
+import { map, scan, shareReplay, startWith, switchMap, tap } from 'rxjs/operators';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type LocationAndVelocity = { location: Vector, velocity: Vector }
@@ -71,6 +71,8 @@ export class AppComponent implements OnInit {
 
     const ball = document.getElementById('ball');
     const ballRadiusInPx = 25;
+    const referencePoint = document.getElementById('ref');
+    const referencePointRadiusInPx = 5;
     const widthInPx = 1400;
     const heightInPx = 1000;
     const topSpeed = 10;
@@ -139,12 +141,20 @@ export class AppComponent implements OnInit {
         startWith(initialLocationAndVelocity)
       )
 
-    const target$ = mouseDown$;
+    const target$ = mouseDown$.pipe(shareReplay());
 
     const combined$ = target$.pipe(
         switchMap((target) => vector$(target))
     );
     
+    // Render target reference.
+    target$.subscribe(({x, y}) => {
+
+      referencePoint.style.left = alignCenterBall(x, referencePointRadiusInPx) + 'px';
+      referencePoint.style.top = alignCenterBall(y, referencePointRadiusInPx) + 'px';
+    });
+
+    // Render moving ball.
     combined$.subscribe(({ location: {x, y}, velocity}) => {
 
       ball.style.left = alignCenterBall(x, ballRadiusInPx) + 'px';
