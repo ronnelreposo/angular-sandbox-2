@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { combineLatest, EMPTY, from, fromEvent, interval, merge, Observable, of, Subject } from 'rxjs';
+import { fromEvent, interval, Observable, Subject } from 'rxjs';
 import * as vector from './core/vector';
 import { Vector } from './core/vector';
-import { map, mapTo, scan, startWith, switchMap, take, takeUntil, tap, withLatestFrom } from 'rxjs/operators';
+import { map, scan, startWith, switchMap, tap } from 'rxjs/operators';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type LocationAndVelocity = { location: Vector, velocity: Vector }
@@ -33,9 +33,10 @@ const limit = (maxMagnitude: number) => (velocity: Vector, accelaration: Vector)
 
 };
 
-const applyForce = (acceleration: Vector) => (force: Vector) => {
+const applyForce = (acceleration: Vector) => ({ force: foce, mass }: { force: Vector, mass: number }) => {
 
-  return vector.add(acceleration)(force)
+  const forceWithMass = vector.divide(mass)(foce);
+  return vector.add(acceleration)(forceWithMass);
 }
 
 const fromMouseEvent = (eventType: string): Observable<Vector> => {
@@ -72,13 +73,13 @@ export class AppComponent implements OnInit {
     const ballRadiusInPx = 25;
     const widthInPx = 1400;
     const heightInPx = 1000;
-    const topSpeed = 1;
+    const topSpeed = 10;
 
     const random = (min: number, max: number) => Math.floor(Math.random() * (max - min)) + min;
 
     const initialLocation: Vector = {
-      x: widthInPx / 2,
-      y: heightInPx / 2
+      x: 200,
+      y: 200
     };
 
     const initialVelocity: Vector = { x: 0, y: 0 };
@@ -94,16 +95,25 @@ export class AppComponent implements OnInit {
             const mappedLocation = mapOnEdge(widthInPx, heightInPx, ballRadiusInPx)
               (location);
 
+            // reset velocity if on edge of world.
+            const velocityPrime = mappedLocation.x == 0 || mappedLocation.y == 0 ? initialVelocity : velocity;
+
             const direction = vector.subtract(targetVector)(mappedLocation);
             const directionNormalized = vector.normalize(direction);
-            const acceleration = vector.multiply(0.1)(directionNormalized);
+            const acceleration = vector.multiply(0.01)(directionNormalized);
 
-            const wind: Vector = { x: 0.5, y: 0 };
-            // apply forces to acceleration.
-            const appliedWindAcceleration = applyForce(acceleration)(wind);
+            const wind: Vector = { x: 0.01, y: 0 };
+            const gravity: Vector = { x: 0.0, y: 0.1 };
+            const mass = 10;
+
+            // Apply forces to acceleration.
+            const appliedWindForceToAcceleration = applyForce(acceleration)
+              ({ force: wind, mass });
+            const appliedGravityToAcceleration = applyForce(appliedWindForceToAcceleration)
+              ({ force: gravity, mass });
 
             // Magnitude of velocity could accelrate at a constant speed, we limit it.
-            const velocityWithAcceleration = limit(topSpeed)(velocity, appliedWindAcceleration);
+            const velocityWithAcceleration = limit(topSpeed)(velocityPrime, appliedGravityToAcceleration);
             const locationVectorPrime = vector.add(mappedLocation)(velocityWithAcceleration);
 
             const locationAndVelocity: LocationAndVelocity = {
