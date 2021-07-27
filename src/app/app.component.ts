@@ -102,18 +102,33 @@ export class AppComponent implements OnInit {
             const directionNormalized = vector.normalize(direction);
             const acceleration = vector.multiply(0.01)(directionNormalized);
 
-            const wind: Vector = { x: 0.01, y: 0 };
-            const gravity: Vector = { x: 0.0, y: 0.1 };
             const mass = 10;
 
-            // Apply forces to acceleration.
+            //#region Apply forces to acceleration.
+
+            // Appy Wind
+            const wind: Vector = { x: 0.01, y: 0 };
             const appliedWindForceToAcceleration = applyForce(acceleration)
               ({ force: wind, mass });
+            
+            // Apply Gravity
+            const gravity: Vector = { x: 0.0, y: 0.1 };
             const appliedGravityToAcceleration = applyForce(appliedWindForceToAcceleration)
               ({ force: gravity, mass });
 
+            // Apply Friction
+            const normal = 1;
+            const frictionCoefficient = 0.03;
+            const frictionMagnitude = frictionCoefficient * normal;
+            const friction = vector.multiply(frictionMagnitude)
+              (vector.normalize(vector.multiply(-1)(velocityPrime)));
+            const appliedFrictionToAcceleration = applyForce(appliedGravityToAcceleration)
+              ({ force: friction, mass: 10 });
+            
+            //#endregion
+
             // Magnitude of velocity could accelrate at a constant speed, we limit it.
-            const velocityWithAcceleration = limit(topSpeed)(velocityPrime, appliedGravityToAcceleration);
+            const velocityWithAcceleration = limit(topSpeed)(velocityPrime, appliedFrictionToAcceleration);
             const locationVectorPrime = vector.add(mappedLocation)(velocityWithAcceleration);
 
             const locationAndVelocity: LocationAndVelocity = {
