@@ -33,9 +33,9 @@ const limit = (maxMagnitude: number) => (velocity: Vector, accelaration: Vector)
 
 };
 
-const applyForce = (acceleration: Vector) => ({ force: foce, mass }: { force: Vector, mass: number }) => {
+const applyForce = (mass: number) => (acceleration: Vector) => (force: Vector) => {
 
-  const forceWithMass = vector.divide(mass)(foce);
+  const forceWithMass = vector.divide(mass)(force);
   return vector.add(acceleration)(forceWithMass);
 }
 
@@ -103,18 +103,17 @@ export class AppComponent implements OnInit {
             const acceleration = vector.multiply(0.01)(directionNormalized);
 
             const mass = 10;
+            const applyForceWithMass = applyForce(mass);
 
             //#region Apply forces to acceleration.
 
             // Appy Wind
             const wind: Vector = { x: 0.01, y: 0 };
-            const appliedWindForceToAcceleration = applyForce(acceleration)
-              ({ force: wind, mass });
+            const appliedWindForceToAcceleration = applyForceWithMass(acceleration)(wind);
             
             // Apply Gravity
             const gravity: Vector = { x: 0.0, y: 0.1 };
-            const appliedGravityToAcceleration = applyForce(appliedWindForceToAcceleration)
-              ({ force: gravity, mass });
+            const appliedGravityToAcceleration = applyForceWithMass(appliedWindForceToAcceleration)(gravity)
 
             // Apply Friction
             const normal = 1;
@@ -122,8 +121,7 @@ export class AppComponent implements OnInit {
             const frictionMagnitude = frictionCoefficient * normal;
             const friction = vector.multiply(frictionMagnitude)
               (vector.normalize(vector.multiply(-1)(velocityPrime)));
-            const appliedFrictionToAcceleration = applyForce(appliedGravityToAcceleration)
-              ({ force: friction, mass: 10 });
+            const appliedFrictionToAcceleration = applyForceWithMass(appliedGravityToAcceleration)(friction);
             
             //#endregion
 
