@@ -1,7 +1,7 @@
 <div style="margin-top: 30px">
-  {{ traceRendering(user.id.toString()) }}
+  <!-- {{ traceRendering(user.id.toString()) }} -->
   <!-- Individual form -->
-  <div style="height: 100px">
+  <div style="height: 100px;" [style.border]="isSelected ? '1px solid red' : ''">
     <form [formGroup]="userForm">
       <div>
         <label for="name">Name</label>

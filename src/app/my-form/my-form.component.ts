@@ -21,7 +21,10 @@ import { AppState } from '../store/app-state';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MyFormComponent implements OnInit, OnDestroy {
-  @Input() user: User;
+
+  @Input() public user: User;
+  @Input() public isSelected: boolean;
+
   userForm: FormGroup;
 
   private destroy$: Subject<void>;
@@ -36,12 +39,12 @@ export class MyFormComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     
-    console.log("[form component] OnInit user id of: ", this.user.id);
+    // console.log("[form component] OnInit user id of: ", this.user.id);
 
     this.destroy$ = new Subject();
 
     const constructUserFormGroup = (user: User): FormGroup => {
-      console.log("[form component] (OnInit->constructing form) user id of: ", this.user.id);
+      // console.log("[form component] (OnInit->constructing form) user id of: ", this.user.id);
       return this.fb.group({
         id: [user.id],
         name: [user.name],

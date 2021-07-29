@@ -5,12 +5,20 @@
     <span>counter: {{ count }}</span>
     <button (click)="increment()">Increment</button>
   </div>
+  
   <div style="margin-top: 30px">
-    <button (click)="load$.next()">Load</button>
+    <button (click)="cmd$.next('noop')">Trigger</button>
+    |
+    <button (click)="cmd$.next('up')">Up</button>
+    <button (click)="cmd$.next('down')">Down</button>
+  </div>
+
+  <div style="margin-top: 30px">
+    <button (click)="load()">Load</button>
   </div>
 
 
   <ng-container *ngFor="let user of (users$ | async); trackBy: trackFunc">
-    <app-my-form [user]="user"></app-my-form>
+    <app-my-form [user]="user" [isSelected]="(selectedUser$ | async) === user.id"></app-my-form>
   </ng-container>
 </div>
