@@ -1,5 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { Vector } from './core/vector';
+import * as vec from './core/vector';
+import { map, scan, take } from 'rxjs/operators';
+import { interval } from 'rxjs';
+import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type WebVector = Vector & { kind: 'web-vector' }
 
@@ -11,7 +15,7 @@ const toWebVec = (dimensions: { widthPx: number, heightPx: number }) => (vector:
   return {
     kind: 'web-vector',
     x: vector.x,
-    y: dimensions.heightPx 
+    y: dimensions.heightPx - vector.y
   }
 };
 
@@ -38,14 +42,32 @@ export class AppComponent implements OnInit {
     const alignCenterBall = alignCenter(ballDiameterPx);
 
     const dimensions = { widthPx: 1400, heightPx: 1000  };
+    const toWebVec_ = toWebVec(dimensions);
 
-    const myVector = { x: 0, y: 0 };
+    const location: Vector = { x: 0, y: 0 };
+    const velocity: Vector= { x: 1, y: 1 };
 
-    const webVector = toWebVec(dimensions)(myVector);
-    const alignedWebVector = alignCenterBall(webVector);
+    // simple motion.
+    const vector$ = interval(1, animationFrame)
+      .pipe(
+        take(300), // <-- limit frame tick for now.
+        // vector in motion
+        scan((currentLocation, _) => {
 
-    const elem = document.getElementById("webVec")
-    elem.style.left = alignedWebVector.x + "px";
-    elem.style.top = alignedWebVector.y + "px";
+            return vec.add(currentLocation)(velocity);
+        }, location),
+        map(toWebVec_)
+      );
+
+    vector$
+    .subscribe(webVector => {
+
+      console.log(webVector)
+
+      const alignedWebVector = alignCenterBall(webVector);
+      const elem = document.getElementById("webVec")
+      elem.style.left = alignedWebVector.x + "px";
+      elem.style.top = alignedWebVector.y + "px";
+    });
   }
 }
