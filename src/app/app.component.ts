@@ -10,7 +10,7 @@ type WebVector = Vector & { kind: 'web-vector' }
 /**
  * Transforms a vector to a vector origin starting from lower left of the browser.
  * */
-const toWebVec = (dimensions: { widthPx: number, heightPx: number }) => (vector: Vector): WebVector => {
+const transformToWebVec = (dimensions: { widthPx: number, heightPx: number }) => (vector: Vector): WebVector => {
 
   return {
     kind: 'web-vector',
@@ -42,7 +42,7 @@ export class AppComponent implements OnInit {
     const alignCenterBall = alignCenter(ballDiameterPx);
 
     const dimensions = { widthPx: 1400, heightPx: 1000  };
-    const toWebVec_ = toWebVec(dimensions);
+    const toWebVec_ = transformToWebVec(dimensions);
 
     const location: Vector = { x: 0, y: 0 };
     const velocity: Vector= { x: 1, y: 1 };
