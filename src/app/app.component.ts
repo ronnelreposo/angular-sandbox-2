@@ -7,6 +7,11 @@ import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type WebVector = Vector & { kind: 'web-vector' }
 
+type LocationAndVelocity = {
+  location: Vector,
+  velocity: Vector
+}
+
 /**
  * Transforms a vector to a vector origin starting from lower left of the browser.
  * */
@@ -27,6 +32,10 @@ const alignCenter = (ballDiameterPx: number) => (webVector: WebVector): WebVecto
   }
 };
 
+const limit = (maxMagnitude: number) => (velocity: Vector, acceleration: Vector) => {
+
+  return (vec.magnitude(velocity) > maxMagnitude) ? velocity : vec.add(velocity)(acceleration);
+};
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -42,21 +51,36 @@ export class AppComponent implements OnInit {
     const alignCenterBall = alignCenter(ballDiameterPx);
 
     const dimensions = { widthPx: 1400, heightPx: 1000  };
-    const toWebVec_ = transformToWebVec(dimensions);
+    const transformWebVec_ = transformToWebVec(dimensions);
 
     const location: Vector = { x: 0, y: 0 };
-    const velocity: Vector= { x: 1, y: 1 };
+    const velocity: Vector = { x: 1, y: 0 };
+    const acceleration: Vector = { x: 0.001, y: 0.01 };
+    const topSpeed = 10;
 
-    // simple motion.
+    const initLocationAndVelocity: LocationAndVelocity = {
+      velocity: velocity,
+      location: location 
+    };
+
+    // simple motion with acceleration of top speed 10.
     const vector$ = interval(1, animationFrame)
       .pipe(
         take(300), // <-- limit frame tick for now.
         // vector in motion
-        scan((currentLocation, _) => {
+        scan((a, _) => {
 
-            return vec.add(currentLocation)(velocity);
-        }, location),
-        map(toWebVec_)
+          const { velocity: currentVelocity, location: currentLocation } = a;
+
+          const velocityWithAcceleration = limit(topSpeed)(currentVelocity, acceleration);
+          const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+
+          return {
+            location: newLocation,
+            velocity: velocityWithAcceleration
+          };
+        }, initLocationAndVelocity),
+        map(({ location }) => transformWebVec_(location))
       );
 
     vector$
