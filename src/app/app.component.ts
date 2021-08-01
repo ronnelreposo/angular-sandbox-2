@@ -24,6 +24,17 @@ const transformToWebVec = (dimensions: { widthPx: number, heightPx: number }) =>
   }
 };
 
+/**
+ * Transforms a webvector to a vector origin starting from lower left of the browser.
+ * */
+const transformFromWebVec = (dimensions: { widthPx: number, heightPx: number }) => (webVec: WebVector): Vector => {
+
+  return {
+    x: webVec.x,
+    y: dimensions.heightPx - webVec.y
+  }
+};
+
 const alignCenter = (ballDiameterPx: number) => (webVector: WebVector): WebVector => {
   return {
     kind: 'web-vector',
