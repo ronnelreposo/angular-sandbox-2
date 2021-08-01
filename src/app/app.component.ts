@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { Vector } from './core/vector';
 import * as vec from './core/vector';
-import { map, scan, take, tap } from 'rxjs/operators';
-import { combineLatest, fromEvent, interval } from 'rxjs';
+import { map, mapTo, scan, switchMap, switchMapTo, take, takeUntil, tap, throttleTime } from 'rxjs/operators';
+import { combineLatest, EMPTY, fromEvent, interval } from 'rxjs';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type WebVector = Vector & { kind: 'web-vector' }
@@ -48,6 +48,12 @@ const limit = (maxMagnitude: number) => (velocity: Vector, acceleration: Vector)
   return (vec.magnitude(velocity) > maxMagnitude) ? velocity
     : vec.add(velocity)(acceleration);
 };
+
+const addForce = (mass: number) => (force: Vector, vector: Vector): Vector => {
+
+  return vec.add(vec.divide(mass)(force))(vector);
+};
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -68,36 +74,45 @@ export class AppComponent implements OnInit {
 
     const location: Vector = { x: 0, y: 0 };
     const velocity: Vector = { x: 0, y: 0 };
-    const topSpeed = 10;
+    const topSpeed = 1;
+    const mass = 10;
 
     const initLocationAndVelocity: LocationAndVelocity = {
       velocity: velocity,
       location: location 
     };
 
-    const mouseMove$ = fromEvent(document, "mousemove")
-      .pipe(
-        map<MouseEvent, WebVector>((ev: MouseEvent) =>
-          ({ kind: "web-vector", x: ev.pageX, y: ev.pageY })),
-        map(transformFromWebVec_),
-        tap(ev => console.log("mouse move vec: ", ev))
-        );
-
     const frame$ = interval(1, animationFrame);
+    const mouseUp$ = fromEvent(document, "mouseup");
+    const mouseDown$ = fromEvent(document, "mousedown");
+
+    const trigger$ = mouseDown$
+        .pipe(
+          switchMapTo(
+            frame$.pipe(takeUntil(mouseUp$))));
 
     // accelerates towards mouse with top speed 10.
-    const animate$ = combineLatest([frame$, mouseMove$])
+    const animate$ = trigger$
       .pipe(
         // take(500), // <-- allow frame limit.
-        scan((a, [_, mouseVector]) => {
+        scan((a, _) => {
 
           const { velocity: currentVelocity, location: currentLocation } = a;
 
-          const direction = vec.subtract(mouseVector)(currentLocation);
+          const targetVector = { x: 0, y: 1 };
+          const direction = vec.subtract(targetVector)(initLocationAndVelocity.location);
           const normalizedDirection = vec.normalize(direction);
-          const scaledNormDirection = vec.multiply(0.01)(normalizedDirection);
+          const scaledNormDirection = vec.multiply(0.5)(normalizedDirection);
 
-          const velocityWithAcceleration = limit(topSpeed)(currentVelocity, scaledNormDirection);
+          const addForceWithMass = addForce(mass);
+
+          const wind: Vector = { x: 0.02, y: 0 };
+          const gravity: Vector = { x: 0, y: -0.05 };
+
+          const velocityWithWind = addForceWithMass(wind, currentVelocity);
+          const velocityWithGravity = addForceWithMass(gravity, velocityWithWind);
+
+          const velocityWithAcceleration = limit(topSpeed)(velocityWithGravity, scaledNormDirection);
           const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
 
           return {
