@@ -1,15 +1,16 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, resolveForwardRef } from '@angular/core';
 import { Vector } from './core/vector';
 import * as vec from './core/vector';
-import { map, mapTo, scan, switchMap, switchMapTo, take, takeUntil, tap, throttleTime } from 'rxjs/operators';
-import { combineLatest, EMPTY, fromEvent, interval } from 'rxjs';
+import { map, mapTo, scan, startWith, switchMap, switchMapTo, take, takeUntil, tap, throttleTime } from 'rxjs/operators';
+import { BehaviorSubject, combineLatest, EMPTY, fromEvent, interval } from 'rxjs';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type WebVector = Vector & { kind: 'web-vector' }
 
-type LocationAndVelocity = {
+type LocationAndVelocityAndAcceleration = {
   location: Vector,
-  velocity: Vector
+  velocity: Vector,
+  acceleration: Vector,
 }
 
 /**
@@ -54,6 +55,50 @@ const addForce = (mass: number) => (force: Vector, vector: Vector): Vector => {
   return vec.add(vec.divide(mass)(force))(vector);
 };
 
+const addAllForces = (mass: number) =>
+  (forces: Vector[], vector: Vector): Vector => {
+
+  const [currentForce, ...restForces] = forces;
+
+  if (!currentForce) {
+
+    return vector;
+  } else {
+
+    const acc_ = addForce(mass)(currentForce, vector);
+    return addAllForces(mass)(restForces, acc_);
+  }
+};
+
+const mapLocationOnWall = (currentLocation: Vector, dimensionsInVector: Vector): Vector => {
+
+  const onGround = currentLocation.y < 0
+  if (onGround) {
+
+    return  { ...currentLocation, y: 0 }
+  }
+  
+  const onRightWall = currentLocation.x > dimensionsInVector.x;
+  if (onRightWall) {
+
+    return { ...currentLocation, x: dimensionsInVector.x }
+  }
+
+  const onLeftWall = (currentLocation).x < 0;
+  if (onLeftWall) {
+
+    return { ...currentLocation, x: 0 }
+  }
+  
+  const onCeiling = currentLocation.y > dimensionsInVector.y
+  if (onCeiling) {
+
+    return { ...currentLocation, y: dimensionsInVector.y }
+  }
+
+  return currentLocation;
+};
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -62,24 +107,42 @@ const addForce = (mass: number) => (force: Vector, vector: Vector): Vector => {
 export class AppComponent implements OnInit {
   title = 'angular-sandbox';
 
+  public webVec: WebVector
+
   ngOnInit() {
-      
+
     const ballDiameterPx = 25;
 
     const alignCenterBall = alignCenter(ballDiameterPx);
 
     const dimensions = { widthPx: 1400, heightPx: 1000  };
+
     const transformWebVec_ = transformToWebVec(dimensions);
     const transformFromWebVec_ = transformFromWebVec(dimensions);
 
+    const dimensionsInWebVec: WebVector = {
+      kind: "web-vector",
+      x: dimensions.widthPx,
+      y: dimensions.heightPx
+    };
+    const dimensionsInVector: Vector = {
+      x: dimensionsInWebVec.x,
+      y: dimensionsInWebVec.y
+    };
+
     const location: Vector = { x: 0, y: 0 };
     const velocity: Vector = { x: 0, y: 0 };
-    const topSpeed = 1;
-    const mass = 10;
+    const topSpeed = 1.5;
+    const mass = 1;
 
-    const initLocationAndVelocity: LocationAndVelocity = {
+    const initLocationAndVelocity: LocationAndVelocityAndAcceleration = {
       velocity: velocity,
-      location: location 
+      location: location,
+      acceleration: velocity 
+    };
+    const targetVector: Vector = {
+      x: dimensionsInVector.x,
+      y: dimensionsInVector.y
     };
 
     const frame$ = interval(1, animationFrame);
@@ -89,48 +152,129 @@ export class AppComponent implements OnInit {
     const trigger$ = mouseDown$
         .pipe(
           switchMapTo(
-            frame$.pipe(takeUntil(mouseUp$))));
+            frame$.pipe(
+              // takeUntil(mouseUp$) <-- for manual trigger.
+              )));
 
-    // accelerates towards mouse with top speed 10.
     const animate$ = trigger$
       .pipe(
-        // take(500), // <-- allow frame limit.
+        // take(1), // <-- allow frame limit.
         scan((a, _) => {
 
-          const { velocity: currentVelocity, location: currentLocation } = a;
+          const {
+            velocity: currentVelocity,
+            location: currentLocation,
+            acceleration: currentAcceleration
+          } = a;
 
-          const targetVector = { x: 0, y: 1 };
           const direction = vec.subtract(targetVector)(initLocationAndVelocity.location);
           const normalizedDirection = vec.normalize(direction);
-          const scaledNormDirection = vec.multiply(0.5)(normalizedDirection);
+          const scaledNormDirection = vec.multiply(0.9)(normalizedDirection);
 
-          const addForceWithMass = addForce(mass);
+          const wind: Vector = { x: 0.01, y: 0.00 };
+          const gravity: Vector = { x: 0, y: -0.005 };
 
-          const wind: Vector = { x: 0.02, y: 0 };
-          const gravity: Vector = { x: 0, y: -0.05 };
+          const onGround = currentLocation.y < 0
+          if (onGround) {
 
-          const velocityWithWind = addForceWithMass(wind, currentVelocity);
-          const velocityWithGravity = addForceWithMass(gravity, velocityWithWind);
+            // Stage 2.
+            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
 
-          const velocityWithAcceleration = limit(topSpeed)(velocityWithGravity, scaledNormDirection);
+            // Simulate. Rotate on impact.
+            const rotatedAcceleration: Vector = { ...reversedAcceleration, x: -reversedAcceleration.x };
+
+            const velocityWithAcceleration = rotatedAcceleration;
+
+            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+            const onGroundLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+            return {
+              location: onGroundLocation,
+              velocity: velocityWithAcceleration,
+              acceleration: velocityWithAcceleration,
+            };
+          }
+          
+          const onRightWall = (currentLocation).x > dimensionsInVector.x;
+          if (onRightWall) {
+
+            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
+            // Simulate. Rotate on impact.
+            const rotatedAcceleration: Vector = { ...reversedAcceleration, y: -reversedAcceleration.y };
+            const velocityWithAcceleration = rotatedAcceleration;
+
+            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+            const walledLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+
+            return {
+              location: walledLocation,
+              velocity: velocityWithAcceleration,
+              acceleration: velocityWithAcceleration,
+            };
+          }
+
+          const onLeftWall = (currentLocation).x < 0;
+          if (onLeftWall) {
+
+            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
+            // Simulate. Rotate on impact.
+            const rotatedAcceleration: Vector = { ...reversedAcceleration, y: -reversedAcceleration.y };
+            const velocityWithAcceleration = rotatedAcceleration;
+
+            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+            const walledLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+
+            return {
+              location: walledLocation,
+              velocity: velocityWithAcceleration,
+              acceleration: velocityWithAcceleration,
+            };
+          }
+          
+          const onCeiling = currentLocation.y > dimensionsInVector.y
+          if (onCeiling) {
+
+            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
+            // Simulate. Rotate on impact.
+            const rotatedAcceleration: Vector = { ...reversedAcceleration, x: -reversedAcceleration.x };
+            const velocityWithAcceleration = rotatedAcceleration;
+
+            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+            const onCeilingLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+
+            return {
+              location: onCeilingLocation,
+              velocity: velocityWithAcceleration,
+              acceleration: velocityWithAcceleration,
+            };
+          }
+
+          const velocityWithAddedForces = addAllForces(mass)([wind, gravity], currentVelocity);
+          const velocityWithAcceleration = limit(topSpeed)(velocityWithAddedForces, scaledNormDirection);
           const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
-
           return {
             location: newLocation,
-            velocity: velocityWithAcceleration
+            velocity: velocityWithAcceleration,
+            acceleration: velocityWithAddedForces
           };
         }, initLocationAndVelocity),
-        map(({ location }) => transformWebVec_(location))
+        // tap(v => console.log("compute v", vec.normalize(v.location))),
+        map(({ location }) => transformWebVec_(location)),
+        startWith(transformWebVec_(location)),
       );
 
     animate$.subscribe(webVector => {
 
-      console.log(webVector)
+      // console.log(webVector)
 
       const alignedWebVector = alignCenterBall(webVector);
+      this.webVec = alignedWebVector;
+
       const elem = document.getElementById("webVec")
       elem.style.left = alignedWebVector.x + "px";
       elem.style.top = alignedWebVector.y + "px";
+
+      // elem.scrollIntoView();
     });
   }
+
 }
