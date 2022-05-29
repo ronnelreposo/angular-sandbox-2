@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { AfterViewInit, Component, OnInit } from '@angular/core';
 import { Vector } from './core/vector';
 import * as vec from './core/vector';
 import { map, scan, take, tap } from 'rxjs/operators';
@@ -8,6 +8,7 @@ import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 type WebVector = Vector & { kind: 'web-vector' }
 
 type LocationAndVelocity = {
+  id: string,
   location: Vector,
   velocity: Vector
 }
@@ -53,43 +54,45 @@ const limit = (maxMagnitude: number) => (velocity: Vector, acceleration: Vector)
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, AfterViewInit {
+  
   title = 'angular-sandbox';
 
-  ngOnInit() {
-      
-    const ballDiameterPx = 25;
+  ballDiameterPx = 25;
 
-    const alignCenterBall = alignCenter(ballDiameterPx);
+  alignCenterBall = alignCenter(this.ballDiameterPx);
 
-    const dimensions = { widthPx: 1400, heightPx: 1000  };
-    const transformWebVec_ = transformToWebVec(dimensions);
-    const transformFromWebVec_ = transformFromWebVec(dimensions);
+  dimensions = { widthPx: 1400, heightPx: 1000  };
+  transformWebVec_ = transformToWebVec(this.dimensions);
+  transformFromWebVec_ = transformFromWebVec(this.dimensions);
 
-    const location: Vector = { x: 0, y: 0 };
-    const velocity: Vector = { x: 0, y: 0 };
-    const topSpeed = 10;
+  location: Vector = { x: 200, y: 0 };
+  velocity: Vector = { x: 0, y: 0 };
+  topSpeed = 10;
 
-    const initLocationAndVelocity: LocationAndVelocity = {
-      velocity: velocity,
-      location: location 
-    };
+  add_ = (v: Vector) => vec.add(v)(this.location)
+
+  public xs: LocationAndVelocity[] = [
+      { id: "mercury", velocity: this.velocity, location: this.add_({ x: 100, y: 100}) },
+      { id: "venus", velocity: this.velocity, location: this.add_({ x: 200, y: 100}) },
+      { id: "mars", velocity: this.velocity, location: this.add_({ x: 100, y: 200}) },
+    ];
+
+  ngOnInit() { }
+
+  ngAfterViewInit(): void {
 
     const mouseMove$ = fromEvent(document, "mousemove")
       .pipe(
         map<MouseEvent, WebVector>((ev: MouseEvent) =>
           ({ kind: "web-vector", x: ev.pageX, y: ev.pageY })),
-        map(transformFromWebVec_),
-        tap(ev => console.log("mouse move vec: ", ev))
+        map(this.transformFromWebVec_),
+        // tap(ev => console.log("mouse move vec: ", ev))
         );
 
     const frame$ = interval(1, animationFrame);
 
-    // accelerates towards mouse with top speed 10.
-    const animate$ = combineLatest([frame$, mouseMove$])
-      .pipe(
-        // take(500), // <-- allow frame limit.
-        scan((a, [_, mouseVector]) => {
+    const f = (a: LocationAndVelocity, [_, mouseVector]: [number, Vector]): LocationAndVelocity => {
 
           const { velocity: currentVelocity, location: currentLocation } = a;
 
@@ -97,25 +100,49 @@ export class AppComponent implements OnInit {
           const normalizedDirection = vec.normalize(direction);
           const scaledNormDirection = vec.multiply(0.01)(normalizedDirection);
 
-          const velocityWithAcceleration = limit(topSpeed)(currentVelocity, scaledNormDirection);
+          const velocityWithAcceleration = limit(this.topSpeed)(currentVelocity, scaledNormDirection);
           const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
 
           return {
+            id: a.id,
             location: newLocation,
             velocity: velocityWithAcceleration
           };
-        }, initLocationAndVelocity),
-        map(({ location }) => transformWebVec_(location))
+
+    };
+
+    // accelerates towards mouse with top speed 10.
+    const animate$ = combineLatest([frame$, mouseMove$])
+      .pipe(
+        // take(500), // <-- allow frame limit.
+        scan((a, x) => {
+
+          return a.map(a_ => f(a_, x));
+          // return f(a, x);
+        }, this.xs),
+        map(xs => xs.map(({id, location}) => ({ id, location: this.transformWebVec_(location) })))
       );
 
-    animate$.subscribe(webVector => {
+    animate$.subscribe(ys => {
 
-      console.log(webVector)
+      // console.log(webVectors)
 
-      const alignedWebVector = alignCenterBall(webVector);
-      const elem = document.getElementById("webVec")
-      elem.style.left = alignedWebVector.x + "px";
-      elem.style.top = alignedWebVector.y + "px";
+      const alignedWebVectors = ys.map(({id, location: webVector}) =>
+        ({ id, alignedWebVector: this.alignCenterBall(webVector) }));
+
+      alignedWebVectors.forEach(({ id, alignedWebVector }) => {
+
+
+        const elem = document.getElementById(id);
+          // console.log(elem);
+        if (elem) {
+          // console.log(elem);
+
+          elem.style.left = alignedWebVector.x + "px";
+          elem.style.top = alignedWebVector.y + "px";
+        }
+      });
     });
+
   }
 }
