@@ -2,7 +2,7 @@ import { Component, OnInit, resolveForwardRef } from '@angular/core';
 import { Vector } from './core/vector';
 import * as vec from './core/vector';
 import { map, mapTo, scan, startWith, switchMap, switchMapTo, take, takeUntil, tap, throttleTime } from 'rxjs/operators';
-import { BehaviorSubject, combineLatest, EMPTY, fromEvent, interval } from 'rxjs';
+import { BehaviorSubject, combineLatest, EMPTY, fromEvent, interval, Observable } from 'rxjs';
 import { animationFrame } from 'rxjs/internal/scheduler/animationFrame';
 
 type WebVector = Vector & { kind: 'web-vector' }
@@ -108,6 +108,7 @@ export class AppComponent implements OnInit {
   title = 'angular-sandbox';
 
   public webVec: WebVector
+  public webVecs$: Observable<WebVector[]> = EMPTY;
 
   ngOnInit() {
 
@@ -130,7 +131,7 @@ export class AppComponent implements OnInit {
       y: dimensionsInWebVec.y
     };
 
-    const location: Vector = { x: 0, y: 0 };
+    const location: Vector = { x: 1, y: 1 };
     const velocity: Vector = { x: 0, y: 0 };
     const topSpeed = 1.5;
     const mass = 1;
@@ -145,7 +146,26 @@ export class AppComponent implements OnInit {
       y: dimensionsInVector.y
     };
 
-    const frame$ = interval(1, animationFrame);
+    const count = 10;
+    const xs = Array<LocationAndVelocityAndAcceleration>(count).fill({
+      velocity: velocity,
+      location: location,//vec.normalize({ x: Math.random(), y: Math.random() }),
+      acceleration: velocity 
+    })
+    .map(x => {
+      // const randromLocations = vec.add({ x: 2, y: 2 })
+      const randromLocations = vec.scale(500 * Math.random())
+      // const randromLocations = vec.scale(1)
+        (vec.normalize({ x: Math.random(), y: Math.random() }))
+      return {
+        ...x,
+        location: randromLocations,
+      };
+    });
+
+    console.log(xs);
+
+    const frame$ = interval(0, animationFrame);
     const mouseUp$ = fromEvent(document, "mouseup");
     const mouseDown$ = fromEvent(document, "mousedown");
 
@@ -156,125 +176,133 @@ export class AppComponent implements OnInit {
               // takeUntil(mouseUp$) <-- for manual trigger.
               )));
 
+    const update = <T>(a: LocationAndVelocityAndAcceleration, _: T): LocationAndVelocityAndAcceleration => {
+
+      const {
+        velocity: currentVelocity,
+        location: currentLocation,
+        acceleration: currentAcceleration
+      } = a;
+
+      const direction = vec.subtract(targetVector)(initLocationAndVelocity.location);
+      const normalizedDirection = vec.normalize(direction);
+      const scaledNormDirection = vec.multiply(0.9)(normalizedDirection);
+
+      // Simple wind.
+      // const wind: Vector = { x: -0.01, y: 0.010 };
+
+      const w1: Vector = vec.normalize({ x: 3, y: 1 });
+      const w2: Vector = vec.normalize({ x: 4.5, y: 2 });
+      const w3: Vector = vec.normalize({ x: 5, y: 5.5 });
+      const upwardWind = vec.scale(0.07)(vec.normalize(vec.add(vec.add(w1)(w2))(w3)));
+      const wind = upwardWind;
+      const gravity: Vector = { x: 0, y: -0.001 };
+
+      const onGround = currentLocation.y < 0
+      if (onGround) {
+
+        // Stage 2.
+        const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
+
+        // Simulate. Rotate on impact.
+        const rotatedAcceleration: Vector = { ...reversedAcceleration, x: -reversedAcceleration.x };
+
+        const damped = vec.multiply(0.5)(rotatedAcceleration);
+        // const velocityWithAcceleration = vec.divide(0.01)(rotatedAcceleration);
+        const velocityWithAcceleration = rotatedAcceleration;
+
+        const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+        const onGroundLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+        return {
+          location: onGroundLocation,
+          velocity: velocityWithAcceleration,
+          acceleration: velocityWithAcceleration,
+        };
+      }
+
+      const onRightWall = (currentLocation).x > dimensionsInVector.x;
+      if (onRightWall) {
+
+        const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
+        // Simulate. Rotate on impact.
+        const rotatedAcceleration: Vector = { ...reversedAcceleration, y: -reversedAcceleration.y };
+
+        const damped = vec.multiply(0.5)(rotatedAcceleration);
+        // const velocityWithAcceleration = vec.subtract(rotatedAcceleration)(damped);
+        const velocityWithAcceleration = rotatedAcceleration;
+
+        const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+        const walledLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+
+        return {
+          location: walledLocation,
+          velocity: velocityWithAcceleration,
+          acceleration: velocityWithAcceleration,
+        };
+      }
+
+      const onLeftWall = (currentLocation).x < 0;
+      if (onLeftWall) {
+
+        const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
+        // Simulate. Rotate on impact.
+        const rotatedAcceleration: Vector = { ...reversedAcceleration, y: -reversedAcceleration.y };
+
+        const velocityWithAcceleration = rotatedAcceleration;
+
+        const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+        const walledLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+
+        return {
+          location: walledLocation,
+          velocity: velocityWithAcceleration,
+          acceleration: velocityWithAcceleration,
+        };
+      }
+
+      const onCeiling = currentLocation.y > dimensionsInVector.y
+      if (onCeiling) {
+
+        const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
+        // Simulate. Rotate on impact.
+        const rotatedAcceleration: Vector = { ...reversedAcceleration, x: -reversedAcceleration.x };
+
+        const velocityWithAcceleration = rotatedAcceleration;
+
+        const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+        const onCeilingLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
+
+        return {
+          location: onCeilingLocation,
+          velocity: velocityWithAcceleration,
+          acceleration: velocityWithAcceleration,
+        };
+      }
+
+      const velocityWithAddedForces = addAllForces(mass)([wind, gravity], currentVelocity);
+      // const damped = vec.multiply(0.6)(velocityWithAddedForces);
+      const velocityWithAcceleration = limit(topSpeed)(velocityWithAddedForces, scaledNormDirection);
+      const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
+      return {
+        location: newLocation,
+        velocity: velocityWithAcceleration,
+        acceleration: velocityWithAddedForces
+      };
+    };
+
+    const updateAll = <T>(a: LocationAndVelocityAndAcceleration[], _: T): LocationAndVelocityAndAcceleration[] => {
+      return a.map(update);
+    };
+
     const animate$ = trigger$
       .pipe(
         // take(1), // <-- allow frame limit.
-        scan((a, _) => {
-
-          const {
-            velocity: currentVelocity,
-            location: currentLocation,
-            acceleration: currentAcceleration
-          } = a;
-
-          const direction = vec.subtract(targetVector)(initLocationAndVelocity.location);
-          const normalizedDirection = vec.normalize(direction);
-          const scaledNormDirection = vec.multiply(0.9)(normalizedDirection);
-
-          const wind: Vector = { x: 0.01, y: 0.00 };
-          const gravity: Vector = { x: 0, y: -0.005 };
-
-          const onGround = currentLocation.y < 0
-          if (onGround) {
-
-            // Stage 2.
-            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
-
-            // Simulate. Rotate on impact.
-            const rotatedAcceleration: Vector = { ...reversedAcceleration, x: -reversedAcceleration.x };
-
-            const velocityWithAcceleration = rotatedAcceleration;
-
-            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
-            const onGroundLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
-            return {
-              location: onGroundLocation,
-              velocity: velocityWithAcceleration,
-              acceleration: velocityWithAcceleration,
-            };
-          }
-          
-          const onRightWall = (currentLocation).x > dimensionsInVector.x;
-          if (onRightWall) {
-
-            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
-            // Simulate. Rotate on impact.
-            const rotatedAcceleration: Vector = { ...reversedAcceleration, y: -reversedAcceleration.y };
-            const velocityWithAcceleration = rotatedAcceleration;
-
-            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
-            const walledLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
-
-            return {
-              location: walledLocation,
-              velocity: velocityWithAcceleration,
-              acceleration: velocityWithAcceleration,
-            };
-          }
-
-          const onLeftWall = (currentLocation).x < 0;
-          if (onLeftWall) {
-
-            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
-            // Simulate. Rotate on impact.
-            const rotatedAcceleration: Vector = { ...reversedAcceleration, y: -reversedAcceleration.y };
-            const velocityWithAcceleration = rotatedAcceleration;
-
-            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
-            const walledLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
-
-            return {
-              location: walledLocation,
-              velocity: velocityWithAcceleration,
-              acceleration: velocityWithAcceleration,
-            };
-          }
-          
-          const onCeiling = currentLocation.y > dimensionsInVector.y
-          if (onCeiling) {
-
-            const reversedAcceleration = vec.multiply(-1)(currentAcceleration);
-            // Simulate. Rotate on impact.
-            const rotatedAcceleration: Vector = { ...reversedAcceleration, x: -reversedAcceleration.x };
-            const velocityWithAcceleration = rotatedAcceleration;
-
-            const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
-            const onCeilingLocation: Vector = mapLocationOnWall(newLocation, dimensionsInVector);
-
-            return {
-              location: onCeilingLocation,
-              velocity: velocityWithAcceleration,
-              acceleration: velocityWithAcceleration,
-            };
-          }
-
-          const velocityWithAddedForces = addAllForces(mass)([wind, gravity], currentVelocity);
-          const velocityWithAcceleration = limit(topSpeed)(velocityWithAddedForces, scaledNormDirection);
-          const newLocation = vec.add(currentLocation)(velocityWithAcceleration);
-          return {
-            location: newLocation,
-            velocity: velocityWithAcceleration,
-            acceleration: velocityWithAddedForces
-          };
-        }, initLocationAndVelocity),
-        // tap(v => console.log("compute v", vec.normalize(v.location))),
-        map(({ location }) => transformWebVec_(location)),
-        startWith(transformWebVec_(location)),
+        scan(updateAll, xs),
+        map(xs => xs.map(({location}) => transformWebVec_(location))),
+        // tap(xs => console.log("compute v", xs)),
       );
 
-    animate$.subscribe(webVector => {
-
-      // console.log(webVector)
-
-      const alignedWebVector = alignCenterBall(webVector);
-      this.webVec = alignedWebVector;
-
-      const elem = document.getElementById("webVec")
-      elem.style.left = alignedWebVector.x + "px";
-      elem.style.top = alignedWebVector.y + "px";
-
-      // elem.scrollIntoView();
-    });
+    this.webVecs$ = animate$;
   }
 
 }

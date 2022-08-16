@@ -1,4 +1,11 @@
-<!-- <div id="truVec" class="red-ball circle float-free"></div> -->
 <div id="fence" class="field fence ">
-  <div id="webVec" class="red circle float-free"></div>
+
+  <ng-container *ngIf="(webVecs$ | async) as webVecs">
+
+    <ng-container *ngFor="let webVec of webVecs">
+
+      <div class="yellow circle float-free"
+        [style.left]="webVec.x + 'px'" [style.top]="webVec.y + 'px'"></div>
+    </ng-container>
+  </ng-container>
 </div>

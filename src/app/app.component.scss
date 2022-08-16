@@ -3,6 +3,7 @@ $ballDiameter: 25px;
 $coolRed: #c0392b;
 $coolGreen: #2ecc71;
 $fieldColor: #2c3e50;
+$coolYellow: #f1c40f;
 
 .circle {
 
@@ -17,6 +18,10 @@ $fieldColor: #2c3e50;
 
 .green {
     background-color: $coolGreen;
+}
+
+.yellow {
+    background-color: $coolYellow;
 }
 
 .red-border {
