@@ -27,6 +27,8 @@ const alignCenter = (ballDiameterPx: number) => (webVector: WebVector): WebVecto
   }
 };
 
+type VelocityAndLocation = { velocity: Vector, location: Vector };
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -45,24 +47,49 @@ export class AppComponent implements OnInit {
     const toWebVec_ = toWebVec(dimensions);
 
     const location: Vector = { x: 0, y: 0 };
-    const velocity: Vector= { x: 1, y: 1 };
+    const velocity: Vector = { x: 1, y: 1 };
+
+
+    const initVelocityAndLocation: VelocityAndLocation = {
+      location, velocity
+    };
+
+    const gravity: Vector = { x: 0, y: -0.001 };
+
+    const update = (a: VelocityAndLocation, _: unknown): VelocityAndLocation => {
+
+      const forces = vec.add(a.velocity)(gravity);
+
+      const dampingFactor = 0.999;
+      const newVelocity = vec.scale(dampingFactor)(forces);
+
+      // at bottom. stop!
+      if (a.location.y < 0) {
+        return {
+          location: vec.add(a.location)(newVelocity),
+          velocity: vec.scale(dampingFactor)({ x: a.velocity.x, y: 0 })
+        };
+      }
+
+      return {
+        location: vec.add(a.location)(newVelocity),
+        velocity: newVelocity
+      };
+    };
 
     // simple motion.
     const vector$ = interval(1, animationFrame)
       .pipe(
-        take(300), // <-- limit frame tick for now.
+        // take(300), // <-- limit frame tick for now.
         // vector in motion
-        scan((currentLocation, _) => {
-
-            return vec.add(currentLocation)(velocity);
-        }, location),
-        map(toWebVec_)
+        scan(update, initVelocityAndLocation),
+        map(d => toWebVec_(d.location))
       );
 
     vector$
     .subscribe(webVector => {
 
-      console.log(webVector)
+      // console.log(webVector)
 
       const alignedWebVector = alignCenterBall(webVector);
       const elem = document.getElementById("webVec")
